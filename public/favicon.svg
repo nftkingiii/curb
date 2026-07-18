@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Curb">
+  <defs>
+    <linearGradient id="spectrum" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ef4937"/>
+      <stop offset=".34" stop-color="#f6b23d"/>
+      <stop offset=".66" stop-color="#3194c8"/>
+      <stop offset="1" stop-color="#4b3f9c"/>
+    </linearGradient>
+    <clipPath id="diamond"><rect x="10" y="10" width="44" height="44" rx="6" transform="rotate(45 32 32)"/></clipPath>
+  </defs>
+  <g clip-path="url(#diamond)">
+    <rect width="64" height="64" fill="url(#spectrum)"/>
+    <path d="M-4 38h72v22H-4z" fill="#10233e" opacity=".94"/>
+    <path d="M-4 34h72v5H-4z" fill="#fff" opacity=".92"/>
+  </g>
+</svg>

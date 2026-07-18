@@ -13,8 +13,16 @@ Curb is a self-custodial native-token vault for Monad. It limits the damage a ph
 - Delayed policy changes and emergency withdrawals
 - Mandatory liquid reserve for withdrawals and staking
 - Native MON delegation, unstaking, and reward claims
+- Scope staking control panel for wallet and vault validator positions
+- Read-only third-party liquid-staking directory with dated APY observations
 
 The frontend cannot override these controls. Funds outside a Curb vault are not protected.
+
+## Scope
+
+Scope reads native Monad delegations for both the connected wallet and its Curb vault. It discovers validator IDs through the staking precompile, then shows active stake, pending epoch activation, and claimable rewards per validator.
+
+Its third-party yield directory is informational only. Rates are dated observations, not guaranteed returns, and Curb never grants these protocols approval or routes vault funds to them.
 
 ## Local development
 
@@ -30,6 +38,18 @@ Run every check:
 ```bash
 pnpm check
 ```
+
+## Railway deployment
+
+Create a Railway service from this repository and enable public networking. The committed `railway.json` selects Railpack, runs `pnpm run build`, starts the production server with `pnpm start`, and verifies each deployment at `/health`.
+
+Set these service variables before deploying:
+
+```text
+VITE_TESTNET_FACTORY_ADDRESS=0x2887fa12671A35eb573d8855550fb68FDCC80A2c
+```
+
+Add `VITE_MAINNET_FACTORY_ADDRESS` only after a reviewed mainnet factory exists. `VITE_*` values are compiled into the browser bundle, so changing an address requires a new deployment. Railway supplies `PORT` automatically; do not set it manually. The production server binds to `0.0.0.0`, serves fingerprinted assets with long-lived caching, and falls back to `index.html` for frontend routes.
 
 ## Contract deployment
 
@@ -60,6 +80,15 @@ For mainnet, first deploy with `ENABLE_STAKING=false`, verify the factory and fr
 - Monad testnet: chain ID `10143`
 - Monad mainnet: chain ID `143`
 - Native asset: `MON`
+
+## Live testnet deployment
+
+- Factory: [`0x2887fa12671A35eb573d8855550fb68FDCC80A2c`](https://testnet.monadvision.com/address/0x2887fa12671A35eb573d8855550fb68FDCC80A2c)
+- Canary vault: [`0x822FCdEC163F78294F179348f73D9FfD5fF11F23`](https://testnet.monadvision.com/address/0x822FCdEC163F78294F179348f73D9FfD5fF11F23)
+- Validator ID: `1`
+- Staking: enabled through the native `0x1000` precompile
+
+The canary was funded with `2 MON` and delegated `0.5 MON` while preserving its configured `1 MON` liquid reserve. Machine-readable deployment details are in `deployments/monad-testnet.json`.
 
 ## Security scope
 

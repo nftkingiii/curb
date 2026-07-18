@@ -1,12 +1,85 @@
-import { useState, type FormEvent } from 'react'
-import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, CircleAlert, Clock3, Coins, ExternalLink, Fingerprint, Gauge, LoaderCircle, LockKeyhole, Menu, ShieldCheck, UserRoundCheck, WalletCards, X } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleAlert, Clock3, Coins, ExternalLink, Fingerprint, Gauge, Layers3, LoaderCircle, LockKeyhole, Menu, RefreshCw, ShieldCheck, UserRoundCheck, WalletCards, X } from 'lucide-react'
 import { isAddress, type Address } from 'viem'
 import { monadMainnet, monadTestnet } from './lib/chain'
 import { useCurb } from './hooks/useCurb'
+import { useScope } from './hooks/useScope'
+import { yieldDirectory } from './lib/scope'
+import curbHero from './assets/curb-spectrum-hero.png'
 
 type Action = 'deposit' | 'send' | 'recipient' | 'stake' | 'unstake' | 'complete' | null
 
 export function App() {
+  const getScreen = () => window.location.hash === '#about' ? 'about' : window.location.hash ? 'vault' : 'landing'
+  const [screen, setScreen] = useState(getScreen)
+  useEffect(() => {
+    const sync = () => setScreen(getScreen())
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
+  const openVault = () => { window.location.hash = 'vault'; window.scrollTo({ top: 0 }) }
+  const openAbout = () => { window.location.hash = 'about'; window.scrollTo({ top: 0 }) }
+  const openLanding = () => { window.location.hash = ''; window.scrollTo({ top: 0 }) }
+  if (screen === 'vault') return <VaultApp onHome={openLanding} onAbout={openAbout} />
+  if (screen === 'about') return <AboutPage onHome={openLanding} onEnter={openVault} />
+  return <LandingPage onEnter={openVault} onAbout={openAbout} />
+}
+
+function LandingPage({ onEnter, onAbout }: { onEnter: () => void; onAbout: () => void }) {
+  return <div className="calm-site">
+    <SiteHeader onHome={() => window.scrollTo({ top: 0, behavior: 'smooth' })} onAbout={onAbout} onEnter={onEnter} />
+    <main className="simple-landing">
+      <section className="simple-copy">
+        <span className="quiet-label">CURB / MONAD</span>
+        <h1>Your money,<br /><em>with boundaries.</em></h1>
+        <button className="spectrum-button" onClick={onEnter}>Open Curb <ArrowRight size={17} /></button>
+      </section>
+      <figure className="hero-art"><img src={curbHero} alt="A dark vault form beside a controlled spectrum of light" /></figure>
+    </main>
+    <footer className="calm-footer"><CurbLogo /><span>Built on Monad</span><a href="https://github.com/nftkingiii/curb" target="_blank" rel="noreferrer">Open source ↗</a></footer>
+  </div>
+}
+
+function AboutPage({ onHome, onEnter }: { onHome: () => void; onEnter: () => void }) {
+  return <div className="calm-site">
+    <SiteHeader onHome={onHome} onAbout={() => window.scrollTo({ top: 0, behavior: 'smooth' })} onEnter={onEnter} aboutActive />
+    <main className="about-main">
+      <section className="about-intro">
+        <span className="quiet-label">ABOUT CURB</span>
+        <h1>A safer place for money that still needs to move.</h1>
+        <p>Curb is a self-custodial Monad vault that turns personal security preferences into rules enforced onchain.</p>
+      </section>
+      <section className="about-feature-grid">
+        <article><span>01</span><h2>Bounded spending</h2><p>Set per-transfer caps, daily limits, recipient cooldowns, and a protected liquid reserve. A compromised interface cannot silently bypass them.</p></article>
+        <figure><img src={curbHero} alt="" /></figure>
+        <article><span>02</span><h2>Protected yield</h2><p>Keep idle MON productive through native staking while preserving enough liquidity for normal use. Yield never gets to overrule the vault policy.</p></article>
+        <article><span>03</span><h2>One staking view</h2><p>Scope shows delegated balances, validator exposure, pending activity, and comparable protocol opportunities in a single control panel.</p></article>
+      </section>
+      <section className="about-principles">
+        <div><span className="quiet-label">THE SECURITY MODEL</span><h2>The vault does not trust the tab.</h2></div>
+        <ol>
+          <li><span>01</span><p><strong>Rules live onchain.</strong> Protection survives a phishing page or compromised frontend.</p></li>
+          <li><span>02</span><p><strong>Relaxation takes time.</strong> Sensitive policy changes use a delay instead of an instant override.</p></li>
+          <li><span>03</span><p><strong>Ownership stays with you.</strong> Curb coordinates spending and staking without taking custody.</p></li>
+        </ol>
+      </section>
+      <section className="about-cta"><div><span className="quiet-label">YOUR KEYS / YOUR RULES</span><h2>Put a curb on risk.</h2></div><button className="spectrum-button" onClick={onEnter}>Open Curb <ArrowRight size={17} /></button></section>
+    </main>
+    <footer className="calm-footer"><CurbLogo /><span>Built on Monad</span><a href="https://github.com/nftkingiii/curb" target="_blank" rel="noreferrer">Open source ↗</a></footer>
+  </div>
+}
+
+function SiteHeader({ onHome, onAbout, onEnter, aboutActive = false }: { onHome: () => void; onAbout: () => void; onEnter: () => void; aboutActive?: boolean }) {
+  return <header className="calm-nav">
+    <button className="calm-logo" onClick={onHome} aria-label="Curb home"><CurbLogo /></button>
+    <nav aria-label="Site navigation"><button className={aboutActive ? 'active' : ''} onClick={onAbout}>About</button><a href="https://github.com/nftkingiii/curb" target="_blank" rel="noreferrer">Source</a></nav>
+    <button className="nav-enter" onClick={onEnter}>Enter vault</button>
+  </header>
+}
+
+function CurbLogo() { return <span className="curb-logo"><i aria-hidden="true" />Curb</span> }
+
+function VaultApp({ onHome, onAbout }: { onHome: () => void; onAbout: () => void }) {
   const curb = useCurb()
   const [action, setAction] = useState<Action>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -17,8 +90,8 @@ export function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <a className="brand" href="#top" aria-label="Curb home"><span className="brand-mark"><span /></span><span>Curb</span></a>
-      <nav className={mobileOpen ? 'nav-links open' : 'nav-links'} aria-label="Primary navigation"><a className="active" href="#overview">Overview</a><a href="#yield">Yield</a><a href="#rules">Rules</a><a href="#about">How it works</a></nav>
+      <button className="brand brand-button" onClick={onHome} aria-label="Return to Curb landing page"><CurbLogo /></button>
+      <nav className={mobileOpen ? 'nav-links open' : 'nav-links'} aria-label="Primary navigation"><a className="active" href="#overview">Overview</a><a href="#scope">Scope</a><a href="#yield">Yield</a><a href="#rules">Rules</a><button onClick={onAbout}>About</button></nav>
       <div className="header-actions">
         <select className="network-select" aria-label="Network" value={curb.targetChainId} onChange={(e) => void curb.selectNetwork(Number(e.target.value))}><option value={monadTestnet.id}>Monad testnet</option><option value={monadMainnet.id}>Monad mainnet</option></select>
         <WalletButton connected={connected} account={curb.account} onClick={curb.connect} />
@@ -49,6 +122,8 @@ export function App() {
         <section className="two-column"><article className="panel"><div className="panel-heading"><div><p className="section-kicker">Recent activity</p><h2>Vault events</h2></div><span className="live-label"><span /> Live</span></div><div className="empty-state"><span className="empty-icon"><Fingerprint size={24} /></span><h3>Onchain by design</h3><p>Deposits, withdrawals, and staking actions are emitted by your vault contract.</p></div></article><article className="panel safety-panel"><p className="section-kicker">Safety posture</p><h2>Yield cannot bypass liquidity rules.</h2><ul><li><Check size={16} /> Mandatory liquid reserve</li><li><Check size={16} /> No arbitrary adapters or approvals</li><li><Check size={16} /> Validator locked while stake is active</li><li><Check size={16} /> Unstaking uses explicit withdrawal slots</li></ul><a href={`${explorer}/address/${curb.vaultAddress}`} target="_blank" rel="noreferrer">Inspect vault contract <ExternalLink size={14} /></a></article></section>
       </>}
 
+      {connected && <ScopePanel account={curb.account} vault={curb.vaultAddress} chain={curb.targetChain} />}
+
       <section className="how-it-works" id="about"><p className="section-kicker">How Curb protects you</p><div className="steps"><div><span>01</span><h3>Park funds</h3><p>Move MON into your personal vault.</p></div><div><span>02</span><h3>Set boundaries</h3><p>Choose spending caps, reserve, and delays.</p></div><div><span>03</span><h3>Earn deliberately</h3><p>Delegate only the balance above your reserve.</p></div></div></section>
     </main>
 
@@ -57,6 +132,21 @@ export function App() {
     <TransactionToast tx={curb.tx} explorer={explorer} />
     {curb.loading && <div className="sync-indicator"><LoaderCircle className="spin" size={14} /> Syncing vault</div>}
   </div>
+}
+
+function ScopePanel({ account, vault, chain }: { account?: Address; vault?: Address; chain: ReturnType<typeof useCurb>['targetChain'] }) {
+  const scope = useScope(account, vault, chain)
+  const total = scope.totals.active + scope.totals.pending
+  return <section className="scope-panel" id="scope">
+    <div className="scope-heading"><div><p className="section-kicker"><Layers3 size={14} /> Scope / staking control panel</p><h2>Every delegation.<br />One control surface.</h2><p>Native positions are read directly from Monad. Protocol rates are dated observations, never promised returns.</p></div><button className="scope-refresh" onClick={() => void scope.refresh()} disabled={scope.loading}><RefreshCw className={scope.loading ? 'spin' : ''} size={16} /> Refresh</button></div>
+    <div className="scope-summary"><article><span>Total delegated</span><strong>{fmt(String(total))} MON</strong><small>active + activating</small></article><article><span>Active</span><strong>{fmt(String(scope.totals.active))} MON</strong><small>earning native rewards</small></article><article><span>Activating</span><strong>{fmt(String(scope.totals.pending))} MON</strong><small>waiting for epoch boundary</small></article><article><span>Claimable</span><strong>{fmt(String(scope.totals.rewards))} MON</strong><small>native rewards</small></article></div>
+
+    <div className="scope-block"><div className="scope-block-head"><div><span className="mono">01 / NATIVE POSITIONS</span><h3>Validator map</h3></div><span className="read-trust">LIVE · ONCHAIN</span></div>
+      {scope.error ? <div className="scope-state error"><CircleAlert size={17} /> {scope.error}</div> : scope.loading ? <div className="scope-state"><LoaderCircle className="spin" size={17} /> Reading Monad staking state…</div> : scope.positions.length === 0 ? <div className="scope-state"><Fingerprint size={17} /> No native validator delegations found for this wallet{vault ? ' or its Curb vault' : ''}.</div> : <div className="scope-table-wrap"><table className="scope-table"><thead><tr><th>Holder</th><th>Validator</th><th>Active</th><th>Activating</th><th>Rewards</th><th>Status</th></tr></thead><tbody>{scope.positions.map((position) => <tr key={`${position.delegator}-${position.validatorId}`}><td><span className={`holder-tag ${position.source === 'Curb vault' ? 'curb' : ''}`}>{position.source}</span></td><td><strong>Validator #{position.validatorId}</strong><small>{position.validatorAddress.slice(0, 8)}…{position.validatorAddress.slice(-6)}</small></td><td>{fmt(position.active)} MON</td><td>{fmt(position.pending)} MON</td><td>{fmt(position.rewards)} MON</td><td><span className="epoch-tag">{Number(position.pending) > 0 ? `Epoch ${position.activationEpoch}` : 'Active'}</span></td></tr>)}</tbody></table></div>}
+    </div>
+
+    <div className="scope-block protocol-directory"><div className="scope-block-head"><div><span className="mono">02 / THIRD-PARTY DIRECTORY</span><h3>Yield field</h3></div><span className="market-note">MAINNET MARKET · READ ONLY</span></div><div className="protocol-grid">{yieldDirectory.map((protocol) => <article key={protocol.name} className="protocol-card"><div className="protocol-top"><span className="protocol-mark">{protocol.name.slice(0, 2).toUpperCase()}</span><div><strong>{protocol.name}</strong><small>{protocol.asset}</small></div><span className={`risk-tag ${protocol.risk.toLowerCase()}`}>{protocol.risk}</span></div><div className="apy-row"><span>Observed APY</span><strong>{protocol.apy}</strong></div><dl><div><dt>Rate type</dt><dd>{protocol.apyKind}</dd></div><div><dt>Exit</dt><dd>{protocol.liquidity}</dd></div></dl><footer><span>{protocol.source}</span><a href={protocol.url} target="_blank" rel="noreferrer">Official site <ExternalLink size={12} /></a></footer></article>)}</div><div className="scope-disclaimer"><ShieldCheck size={16} /><p>Curb does not route funds to these protocols. Rates change, and liquid staking adds contract, liquidity, and depeg risk. Links are restricted to curated official domains.</p></div></div>
+  </section>
 }
 
 function WalletButton({ connected, account, onClick }: { connected: boolean; account?: Address; onClick: () => void }) { return <button className="wallet-button" onClick={onClick}><WalletCards size={17} /> {connected && account ? `${account.slice(0, 6)}…${account.slice(-4)}` : 'Connect wallet'}</button> }

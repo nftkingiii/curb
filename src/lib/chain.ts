@@ -25,7 +25,7 @@ export function getChain(chainId: number): SupportedChain {
 }
 
 const factories: Partial<Record<number, Address>> = {
-  [monadTestnet.id]: (import.meta.env.VITE_TESTNET_FACTORY_ADDRESS || import.meta.env.VITE_FACTORY_ADDRESS) as Address | undefined,
+  [monadTestnet.id]: (import.meta.env.VITE_TESTNET_FACTORY_ADDRESS || import.meta.env.VITE_FACTORY_ADDRESS || '0x2887fa12671A35eb573d8855550fb68FDCC80A2c') as Address,
   [monadMainnet.id]: import.meta.env.VITE_MAINNET_FACTORY_ADDRESS as Address | undefined,
 }
 

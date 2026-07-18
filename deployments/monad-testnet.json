@@ -1,0 +1,17 @@
+{
+  "network": "Monad Testnet",
+  "chainId": 10143,
+  "stakingPrecompile": "0x0000000000000000000000000000000000001000",
+  "stakingEnabled": true,
+  "factory": {
+    "address": "0x2887fa12671A35eb573d8855550fb68FDCC80A2c",
+    "deploymentTransaction": "0x206a47eb2a8c79cc5ac97269d22ad57183b09ff527f6e8a96ba9fc142e802882"
+  },
+  "canary": {
+    "owner": "0xd14EC5f515A26A18d11977d2a290bc85319C2428",
+    "vault": "0x822FCdEC163F78294F179348f73D9fFD5fF11F23",
+    "validatorId": 1,
+    "liquidReserveMON": "1",
+    "delegatedMON": "0.5"
+  }
+}
