@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleAlert, Clock3, Coins, ExternalLink, Fingerprint, Gauge, Layers3, LoaderCircle, LockKeyhole, Menu, RefreshCw, ShieldCheck, UserRoundCheck, WalletCards, X } from 'lucide-react'
 import { isAddress, type Address } from 'viem'
 import { monadMainnet, monadTestnet } from './lib/chain'
@@ -83,15 +83,22 @@ function VaultApp({ onHome, onAbout }: { onHome: () => void; onAbout: () => void
   const curb = useCurb()
   const [action, setAction] = useState<Action>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState(() => ['overview', 'scope', 'yield', 'rules'].includes(window.location.hash.slice(1)) ? window.location.hash.slice(1) : 'overview')
   const connected = Boolean(curb.account)
   const wrongChain = connected && curb.chainId !== curb.targetChainId
   const hasVault = Boolean(curb.vaultAddress)
   const explorer = curb.targetChain.blockExplorers.default.url
+  const goToSection = (section: string) => {
+    setActiveSection(section)
+    setMobileOpen(false)
+    window.history.replaceState(null, '', '#' + section)
+    document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return <div className="app-shell">
     <header className="topbar">
       <button className="brand brand-button" onClick={onHome} aria-label="Return to Curb landing page"><CurbLogo /></button>
-      <nav className={mobileOpen ? 'nav-links open' : 'nav-links'} aria-label="Primary navigation"><a className="active" href="#overview">Overview</a><a href="#scope">Scope</a><a href="#yield">Yield</a><a href="#rules">Rules</a><button onClick={onAbout}>About</button></nav>
+      <nav className={mobileOpen ? 'nav-links open' : 'nav-links'} aria-label="Primary navigation">{['overview', 'scope', 'yield', 'rules'].map((section) => <button className={activeSection === section ? 'active' : ''} key={section} onClick={() => goToSection(section)}>{section[0].toUpperCase()}{section.slice(1)}</button>)}<button onClick={onAbout}>About</button></nav>
       <div className="header-actions">
         <select className="network-select" aria-label="Network" value={curb.targetChainId} onChange={(e) => void curb.selectNetwork(Number(e.target.value))}><option value={monadTestnet.id}>Monad testnet</option><option value={monadMainnet.id}>Monad mainnet</option></select>
         <WalletButton connected={connected} account={curb.account} onClick={curb.connect} />
@@ -122,7 +129,10 @@ function VaultApp({ onHome, onAbout }: { onHome: () => void; onAbout: () => void
         <section className="two-column"><article className="panel"><div className="panel-heading"><div><p className="section-kicker">Recent activity</p><h2>Vault events</h2></div><span className="live-label"><span /> Live</span></div><div className="empty-state"><span className="empty-icon"><Fingerprint size={24} /></span><h3>Onchain by design</h3><p>Deposits, withdrawals, and staking actions are emitted by your vault contract.</p></div></article><article className="panel safety-panel"><p className="section-kicker">Safety posture</p><h2>Yield cannot bypass liquidity rules.</h2><ul><li><Check size={16} /> Mandatory liquid reserve</li><li><Check size={16} /> No arbitrary adapters or approvals</li><li><Check size={16} /> Validator locked while stake is active</li><li><Check size={16} /> Unstaking uses explicit withdrawal slots</li></ul><a href={`${explorer}/address/${curb.vaultAddress}`} target="_blank" rel="noreferrer">Inspect vault contract <ExternalLink size={14} /></a></article></section>
       </>}
 
-      {connected && <ScopePanel account={curb.account} vault={curb.vaultAddress} chain={curb.targetChain} />}
+      {!hasVault && <FeaturePreview id="yield" icon={<Coins />} kicker="Native MON staking" title="Yield, bounded by your reserve." copy="Once a Curb vault exists, MON above its protected liquid floor can be delegated directly through Monad's staking precompile." status={connected ? 'Create your vault to enable staking controls' : 'Connect a wallet to continue'} />}
+      {!hasVault && <FeaturePreview id="rules" icon={<Gauge />} kicker="Onchain guardrails" title="Rules that survive a bad click." copy="Per-transfer caps, daily allowances, recipient cooldowns, reserve floors, and delayed policy changes are enforced by the vault, not the browser tab." status={connected ? 'Create your vault to configure rules' : 'Connect a wallet to continue'} />}
+
+      <ScopePanel account={curb.account} vault={curb.vaultAddress} chain={curb.targetChain} />
 
       <section className="how-it-works" id="about"><p className="section-kicker">How Curb protects you</p><div className="steps"><div><span>01</span><h3>Park funds</h3><p>Move MON into your personal vault.</p></div><div><span>02</span><h3>Set boundaries</h3><p>Choose spending caps, reserve, and delays.</p></div><div><span>03</span><h3>Earn deliberately</h3><p>Delegate only the balance above your reserve.</p></div></div></section>
     </main>
@@ -134,11 +144,15 @@ function VaultApp({ onHome, onAbout }: { onHome: () => void; onAbout: () => void
   </div>
 }
 
+function FeaturePreview({ id, icon, kicker, title, copy, status }: { id: string; icon: ReactNode; kicker: string; title: string; copy: string; status: string }) {
+  return <section className="feature-preview" id={id}><div><p className="section-kicker">{icon} {kicker}</p><h2>{title}</h2><p>{copy}</p></div><span><LockKeyhole size={16} /> {status}</span></section>
+}
+
 function ScopePanel({ account, vault, chain }: { account?: Address; vault?: Address; chain: ReturnType<typeof useCurb>['targetChain'] }) {
   const scope = useScope(account, vault, chain)
   const total = scope.totals.active + scope.totals.pending
   return <section className="scope-panel" id="scope">
-    <div className="scope-heading"><div><p className="section-kicker"><Layers3 size={14} /> Scope / staking control panel</p><h2>Every delegation.<br />One control surface.</h2><p>Native positions are read directly from Monad. Protocol rates are dated observations, never promised returns.</p></div><button className="scope-refresh" onClick={() => void scope.refresh()} disabled={scope.loading}><RefreshCw className={scope.loading ? 'spin' : ''} size={16} /> Refresh</button></div>
+    <div className="scope-heading"><div><p className="section-kicker"><Layers3 size={14} /> Scope / staking control panel</p><h2>Every delegation.<br />One control surface.</h2><p>Native positions are read directly from Monad. Protocol rates are dated observations, never promised returns.</p></div><button className="scope-refresh" onClick={() => void scope.refresh()} disabled={scope.loading || !account}><RefreshCw className={scope.loading ? 'spin' : ''} size={16} /> Refresh</button></div>
     <div className="scope-summary"><article><span>Total delegated</span><strong>{fmt(String(total))} MON</strong><small>active + activating</small></article><article><span>Active</span><strong>{fmt(String(scope.totals.active))} MON</strong><small>earning native rewards</small></article><article><span>Activating</span><strong>{fmt(String(scope.totals.pending))} MON</strong><small>waiting for epoch boundary</small></article><article><span>Claimable</span><strong>{fmt(String(scope.totals.rewards))} MON</strong><small>native rewards</small></article></div>
 
     <div className="scope-block"><div className="scope-block-head"><div><span className="mono">01 / NATIVE POSITIONS</span><h3>Validator map</h3></div><span className="read-trust">LIVE · ONCHAIN</span></div>
