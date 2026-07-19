@@ -30,11 +30,13 @@ export function useCurb() {
   const [policy, setPolicy] = useState({ perTx: '0', daily: '0', reserve: '0', cooldownHours: 0, changeDelayHours: 0, validatorId: 0 })
   const [tx, setTx] = useState<TransactionState>({ kind: 'idle', message: 'No transaction in progress.' })
   const [loading, setLoading] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [providerAvailable, setProviderAvailable] = useState(() => Boolean(window.ethereum))
 
   const targetChain = useMemo(() => getChain(targetChainId), [targetChainId])
   const factoryAddress = getFactoryAddress(targetChainId)
   const publicClient = useMemo(() => createPublicClient({ chain: targetChain, transport: http() }), [targetChain])
-  const walletClient = useMemo(() => window.ethereum ? createWalletClient({ chain: targetChain, transport: custom(window.ethereum) }) : undefined, [targetChain])
+  const getWalletClient = () => window.ethereum ? createWalletClient({ chain: targetChain, transport: custom(window.ethereum) }) : undefined
 
   const syncWallet = useCallback(async () => {
     if (!window.ethereum) return
@@ -68,33 +70,59 @@ export function useCurb() {
   useEffect(() => { void syncWallet() }, [syncWallet])
   useEffect(() => { void refreshVault() }, [refreshVault])
   useEffect(() => {
+    const detectProvider = () => setProviderAvailable(Boolean(window.ethereum))
+    window.addEventListener('ethereum#initialized', detectProvider, { once: true })
+    const timer = window.setTimeout(detectProvider, 1000)
+    return () => { window.removeEventListener('ethereum#initialized', detectProvider); window.clearTimeout(timer) }
+  }, [])
+  useEffect(() => {
     if (!window.ethereum) return
     const changed = (hex: unknown) => setChainId(Number.parseInt(String(hex), 16))
+    const accountsChanged = (value: unknown) => setAccount((value as Address[])[0])
     window.ethereum.on?.('chainChanged', changed)
-    return () => window.ethereum?.removeListener?.('chainChanged', changed)
-  }, [])
+    window.ethereum.on?.('accountsChanged', accountsChanged)
+    return () => {
+      window.ethereum?.removeListener?.('chainChanged', changed)
+      window.ethereum?.removeListener?.('accountsChanged', accountsChanged)
+    }
+  }, [providerAvailable])
 
   const switchNetwork = async (nextId = targetChainId) => {
-    if (!window.ethereum) return
+    if (!window.ethereum) { setTx({ kind: 'error', message: 'No browser wallet detected. Open Curb in the browser where your EVM wallet extension is installed.' }); return false }
     const chain = getChain(nextId)
     try {
       await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: `0x${chain.id.toString(16)}` }] })
-    } catch {
-      await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: `0x${chain.id.toString(16)}`, chainName: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: chain.rpcUrls.default.http, blockExplorerUrls: [chain.blockExplorers.default.url] }] })
+    } catch (error) {
+      if (getProviderErrorCode(error) !== 4902) { setTx({ kind: 'error', message: getErrorMessage(error, `Could not switch to ${chain.name}.`) }); return false }
+      try {
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: `0x${chain.id.toString(16)}`, chainName: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: chain.rpcUrls.default.http, blockExplorerUrls: [chain.blockExplorers.default.url] }] })
+      } catch (addError) { setTx({ kind: 'error', message: getErrorMessage(addError, `Could not add ${chain.name} to your wallet.`) }); return false }
     }
     setChainId(chain.id)
+    return true
   }
 
   const selectNetwork = async (nextId: number) => { setTargetChainId(nextId); setVaultAddress(undefined); if (account) await switchNetwork(nextId) }
   const connect = async () => {
-    if (!walletClient) return setTx({ kind: 'error', message: 'No injected wallet found. Install MetaMask or another EVM wallet.' })
-    try { const [connected] = await walletClient.requestAddresses(); setAccount(connected); await switchNetwork() }
+    const walletClient = getWalletClient()
+    if (!walletClient) return setTx({ kind: 'error', message: 'No browser wallet detected. Open Curb in the browser where MetaMask or another EVM wallet is installed.' })
+    setProviderAvailable(true)
+    setConnecting(true)
+    setTx({ kind: 'pending', message: 'Wallet request opened. Approve the connection in your wallet.' })
+    try {
+      const [connected] = await walletClient.requestAddresses()
+      if (!connected) throw new Error('The wallet returned no account.')
+      setAccount(connected)
+      if (await switchNetwork()) setTx({ kind: 'idle', message: 'Wallet connected.' })
+    }
     catch (error) { setTx({ kind: 'error', message: getErrorMessage(error, 'Wallet connection was rejected.') }) }
+    finally { setConnecting(false) }
   }
 
   const write = async (label: string, request: ContractWriteRequest) => {
+    const walletClient = getWalletClient()
     if (!walletClient || !account) return
-    if (chainId !== targetChain.id) await switchNetwork()
+    if (chainId !== targetChain.id && !(await switchNetwork())) return
     setTx({ kind: 'pending', message: `${label} — confirm in your wallet.` })
     try {
       const hash = await walletClient.writeContract({ ...request, account, chain: targetChain } as Parameters<typeof walletClient.writeContract>[0])
@@ -115,10 +143,15 @@ export function useCurb() {
   const completeUnstake = (withdrawId: number) => vaultAddress && write('Complete unstake', { address: vaultAddress, abi: vaultAbi, functionName: 'completeUnstake', args: [withdrawId] })
   const claimRewards = () => vaultAddress && write('Claim rewards', { address: vaultAddress, abi: vaultAbi, functionName: 'claimRewards' })
 
-  return { account, chainId, targetChain, targetChainId, factoryAddress, vaultAddress, balance, available, delegated, pendingUnstake, stakingEnabled, policy, tx, loading, configured: Boolean(factoryAddress), connect, switchNetwork, selectNetwork, createVault, deposit, registerRecipient, withdraw, stake, requestUnstake, completeUnstake, claimRewards }
+  return { account, chainId, targetChain, targetChainId, factoryAddress, vaultAddress, balance, available, delegated, pendingUnstake, stakingEnabled, policy, tx, loading, connecting, providerAvailable, configured: Boolean(factoryAddress), connect, switchNetwork, selectNetwork, createVault, deposit, registerRecipient, withdraw, stake, requestUnstake, completeUnstake, claimRewards }
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) { const firstLine = error.message.split('\n')[0]; return firstLine.length > 150 ? fallback : firstLine }
   return fallback
+}
+
+function getProviderErrorCode(error: unknown) {
+  if (typeof error === 'object' && error && 'code' in error) return Number((error as { code: unknown }).code)
+  return undefined
 }
